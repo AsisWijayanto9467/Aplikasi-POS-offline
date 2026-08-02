@@ -282,6 +282,8 @@ class TransactionController extends ChangeNotifier {
         customerName: _customerName,
         notes: _notes,
         status: 'completed',
+        transactionDate: DateTime.now().toIso8601String(),
+        createdAt: DateTime.now().toIso8601String(),
       );
 
       final transactionId = await db.insert(
