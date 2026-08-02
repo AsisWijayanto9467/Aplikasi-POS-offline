@@ -1,12 +1,17 @@
 // lib/presentation/pages/settings/printer/printer_screen.dart
 import 'package:flutter/material.dart';
-import 'package:blue_thermal_printer/blue_thermal_printer.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:salon_desk/core/theme/app_text_styles.dart';
 import 'package:salon_desk/data/controller/printer_controller.dart';
 import 'package:salon_desk/data/models/printer_setting_model.dart';
 
 class PrinterScreen extends StatefulWidget {
-  const PrinterScreen({super.key});
+  final Map<String, dynamic>? receiptData;
+  
+  const PrinterScreen({
+    super.key,
+    this.receiptData,
+  });
 
   @override
   State<PrinterScreen> createState() => _PrinterScreenState();
@@ -30,6 +35,21 @@ class _PrinterScreenState extends State<PrinterScreen> {
   void initState() {
     super.initState();
     _controller = PrinterController();
+    _initController();
+    
+    // ✅ Jika ada data struk, set header/footer dari data
+    if (widget.receiptData != null) {
+      if (widget.receiptData!['header'] != null) {
+        _headerController.text = widget.receiptData!['header'];
+      }
+      if (widget.receiptData!['footer'] != null) {
+        _footerController.text = widget.receiptData!['footer'];
+      }
+    }
+  }
+
+  Future<void> _initController() async {
+    await _controller.init();
     _loadData();
   }
 
@@ -44,8 +64,10 @@ class _PrinterScreenState extends State<PrinterScreen> {
 
   void _updateControllers(PrinterSettingModel settings) {
     _printerNameController.text = settings.printerName;
-    _headerController.text = settings.printHeader;
-    _footerController.text = settings.printFooter;
+    if (widget.receiptData == null) {
+      _headerController.text = settings.printHeader;
+      _footerController.text = settings.printFooter;
+    }
     _selectedPaperSize = settings.paperSize;
     _isPrinterActive = settings.isConnected == 1;
     _showLogo = settings.showLogo == 1;
@@ -86,10 +108,50 @@ class _PrinterScreenState extends State<PrinterScreen> {
     }
   }
 
+  // ========== PRINT RECEIPT ==========
+  Future<void> _printReceipt() async {
+    if (!_controller.isConnected) {
+      _showSnackBar(
+        'Printer tidak terhubung. Silakan hubungkan printer terlebih dahulu.',
+        isError: true,
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    // ✅ Siapkan data struk
+    final receiptData = widget.receiptData ?? {
+      'header': _headerController.text.isNotEmpty ? _headerController.text : 'SALON CANTIK',
+      'items': [
+        {'name': 'Contoh Item', 'qty': 1, 'price': 10000, 'subtotal': 10000},
+      ],
+      'total': 10000,
+      'footer': _footerController.text.isNotEmpty ? _footerController.text : 'Terima kasih telah berkunjung',
+    };
+
+    final success = await _controller.printReceipt(receiptData);
+    
+    setState(() => _isLoading = false);
+
+    if (success) {
+      _showSnackBar('Struk berhasil dicetak!', isError: false);
+      // Kembali ke halaman sebelumnya setelah print
+      Future.delayed(const Duration(milliseconds: 500), () {
+        Navigator.pop(context, true);
+      });
+    } else {
+      _showSnackBar(
+        _controller.error ?? 'Gagal mencetak struk',
+        isError: true,
+      );
+    }
+  }
+
+  // ========== SCAN BLUETOOTH ==========
   Future<void> _scanAndConnect() async {
     setState(() => _isLoading = true);
     
-    // Show loading dialog
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -103,6 +165,12 @@ class _PrinterScreenState extends State<PrinterScreen> {
                 CircularProgressIndicator(color: Color(0xFF7E0092)),
                 SizedBox(height: 16),
                 Text('Mencari perangkat Bluetooth...'),
+                SizedBox(height: 8),
+                Text(
+                  'Pastikan Bluetooth aktif dan perangkat dalam jangkauan',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF837281)),
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
           ),
@@ -111,6 +179,7 @@ class _PrinterScreenState extends State<PrinterScreen> {
     );
 
     await _controller.scanDevices();
+    await Future.delayed(const Duration(milliseconds: 500));
     
     Navigator.pop(context);
     setState(() => _isLoading = false);
@@ -118,11 +187,58 @@ class _PrinterScreenState extends State<PrinterScreen> {
     if (_controller.devices.isNotEmpty) {
       _showDeviceSelectionDialog();
     } else {
-      _showSnackBar(
-        'Tidak ditemukan perangkat Bluetooth. Pastikan Bluetooth aktif.',
-        isError: true,
-      );
+      _showNoDeviceDialog();
     }
+  }
+
+  void _showNoDeviceDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text('Tidak Ada Perangkat'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.bluetooth_disabled_rounded,
+              size: 48,
+              color: Color(0xFF837281),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Tidak ditemukan perangkat Bluetooth.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Pastikan:\n1. Bluetooth aktif\n2. Perangkat printer menyala\n3. Perangkat dalam jangkauan',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF837281)),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _scanAndConnect();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF7E0092),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Coba Lagi'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showDeviceSelectionDialog() {
@@ -190,9 +306,10 @@ class _PrinterScreenState extends State<PrinterScreen> {
   }
 
   Widget _buildDeviceTile(BluetoothDevice device) {
-    // Perbaikan: handle null dengan aman
-    final deviceName = device.name ?? 'Perangkat Bluetooth';
-    final deviceAddress = device.address ?? 'Alamat tidak tersedia';
+    final deviceName = device.platformName.isNotEmpty 
+        ? device.platformName 
+        : 'Perangkat Bluetooth';
+    final deviceAddress = device.remoteId.toString();
     
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -228,36 +345,12 @@ class _PrinterScreenState extends State<PrinterScreen> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              deviceAddress,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF837281),
-              ),
-            ),
-            // Cek apakah device sudah terhubung dengan controller
-            if (_controller.selectedDevice != null && 
-                _controller.selectedDevice?.address == device.address)
-              Container(
-                margin: const EdgeInsets.only(top: 2),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5E9),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'Terhubung',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF2E7D32),
-                  ),
-                ),
-              ),
-          ],
+        subtitle: Text(
+          deviceAddress,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Color(0xFF837281),
+          ),
         ),
         trailing: const Icon(
           Icons.arrow_forward_ios_rounded,
@@ -271,7 +364,6 @@ class _PrinterScreenState extends State<PrinterScreen> {
   Future<void> _connectToDevice(BluetoothDevice device) async {
     setState(() => _isLoading = true);
 
-    // Show connecting dialog
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -346,6 +438,13 @@ class _PrinterScreenState extends State<PrinterScreen> {
         ),
         centerTitle: true,
         actions: [
+          // ✅ Tombol Cetak Struk di AppBar
+          if (widget.receiptData != null)
+            IconButton(
+              icon: const Icon(Icons.print_rounded, color: Color(0xFF7E0092)),
+              onPressed: _isLoading ? null : _printReceipt,
+              tooltip: 'Cetak Struk',
+            ),
           IconButton(
             icon: _isSaving
                 ? const SizedBox(
@@ -374,6 +473,66 @@ class _PrinterScreenState extends State<PrinterScreen> {
                   // Status Printer
                   _buildStatusCard(),
                   const SizedBox(height: 16),
+                  
+                  // ✅ Card untuk Cetak Struk (jika ada data)
+                  if (widget.receiptData != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE8F5E9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFF4CAF50).withOpacity(0.2),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.receipt_long_rounded,
+                            color: Color(0xFF2E7D32),
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Siap Cetak Struk',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF1A1C1F),
+                                  ),
+                                ),
+                                Text(
+                                  'Total: Rp ${(widget.receiptData?['total'] ?? 0).toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF514250),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ElevatedButton(
+                            onPressed: _isLoading ? null : _printReceipt,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF7E0092),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: const Text('Cetak'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   
                   // Settings
                   _buildSwitchTile(
@@ -492,7 +651,7 @@ class _PrinterScreenState extends State<PrinterScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Terhubung ke: ${_controller.selectedDevice?.name ?? ''}',
+                                  'Terhubung ke: ${_controller.selectedDevice?.platformName ?? ''}',
                                   style: const TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
@@ -500,7 +659,7 @@ class _PrinterScreenState extends State<PrinterScreen> {
                                   ),
                                 ),
                                 Text(
-                                  _controller.selectedDevice?.address ?? '',
+                                  _controller.selectedDevice?.remoteId.toString() ?? '',
                                   style: const TextStyle(
                                     fontSize: 11,
                                     color: Color(0xFF837281),
@@ -579,7 +738,7 @@ class _PrinterScreenState extends State<PrinterScreen> {
                 ),
                 Text(
                   isConnected 
-                      ? (_controller.selectedDevice?.name ?? 'Thermal Printer')
+                      ? (_controller.selectedDevice?.platformName ?? 'Thermal Printer')
                       : 'Silakan hubungkan printer melalui Bluetooth',
                   style: AppTextStyles.caption.copyWith(
                     color: isConnected 

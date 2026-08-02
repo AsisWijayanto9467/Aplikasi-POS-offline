@@ -1,4 +1,4 @@
-// lib/presentation/pages/main_screen.dart (Update bagian center button)
+// lib/presentation/pages/main_screen.dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,7 +16,7 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
 
   final List<Widget> _screens = [
@@ -34,6 +34,42 @@ class _MainScreenState extends State<MainScreen> {
     'Laporan',
     'Pengaturan',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // ✅ Gunakan addPostFrameCallback untuk memastikan orientasi diatur setelah build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setPortrait();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _setPortrait();
+    }
+  }
+
+  @override
+  Future<bool> didPopRoute() async {
+    _setPortrait();
+    return super.didPopRoute();
+  }
+
+  void _setPortrait() {
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,7 +104,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // ========== HEADER ==========
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
@@ -228,7 +263,6 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // ========== BOTTOM NAVIGATION ==========
   Widget _buildBottomNav() {
     return Container(
       decoration: BoxDecoration(
@@ -263,7 +297,7 @@ class _MainScreenState extends State<MainScreen> {
                   children: [
                     _buildNavItem(Icons.dashboard_rounded, 'Dashboard', 0),
                     _buildNavItem(Icons.receipt_long_rounded, 'Riwayat', 1),
-                    _buildCenterButton(), // <-- Transaksi button di sini
+                    _buildCenterButton(),
                     _buildNavItem(Icons.analytics_rounded, 'Laporan', 3),
                     _buildNavItem(Icons.more_horiz_rounded, 'Lainnya', 4),
                   ],
@@ -330,14 +364,14 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // ========== CENTER BUTTON - TRANSAKSI (KOTAK) ==========
   Widget _buildCenterButton() {
-    final isActive = _currentIndex == 2;
-    
     return GestureDetector(
       onTap: () {
-        setState(() {
-          _currentIndex = 2;
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const TransactionScreen()),
+        ).then((_) {
+          _setPortrait();
         });
       },
       child: Column(
@@ -345,51 +379,38 @@ class _MainScreenState extends State<MainScreen> {
         children: [
           AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            width: isActive ? 64 : 60,
-            height: isActive ? 64 : 60,
+            width: 60,
+            height: 60,
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: isActive 
-                  ? [AppColors.primary, AppColors.primaryDark] 
-                  : AppColors.primaryGradient,
+                colors: AppColors.primaryGradient,
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(16), // <-- Kotak dengan border radius
+              borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withOpacity(isActive ? 0.5 : 0.4),
-                  blurRadius: isActive ? 20 : 15,
+                  color: AppColors.primary.withOpacity(0.4),
+                  blurRadius: 15,
                   offset: const Offset(0, 4),
                 ),
               ],
             ),
-            child: Icon(
-              Icons.point_of_sale_rounded, // <-- Icon mesin kasir
+            child: const Icon(
+              Icons.point_of_sale_rounded,
               color: Colors.white,
-              size: isActive ? 32 : 28,
+              size: 28,
             ),
           ),
           const SizedBox(height: 4),
-          Text(
+          const Text(
             'Transaksi',
             style: TextStyle(
               fontSize: 10,
-              fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-              color: isActive ? AppColors.primary : AppColors.navInactive,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF7E0092),
             ),
           ),
-          if (isActive)
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              margin: const EdgeInsets.only(top: 2),
-              height: 2,
-              width: 16,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
         ],
       ),
     );

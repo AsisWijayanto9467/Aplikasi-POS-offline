@@ -1,14 +1,11 @@
+// lib/data/models/package_detail_model.dart
 class PackageDetailModel {
   final int? id;
   final int packageId;
-  final String itemType; // 'product' atau 'service'
+  final String itemType;
   final int itemId;
   final int quantity;
   final String? createdAt;
-
-  // Relasi
-  String? itemName;
-  double? itemPrice;
 
   PackageDetailModel({
     this.id,
@@ -17,8 +14,6 @@ class PackageDetailModel {
     required this.itemId,
     this.quantity = 1,
     this.createdAt,
-    this.itemName,
-    this.itemPrice,
   });
 
   Map<String, dynamic> toMap() {
@@ -40,11 +35,6 @@ class PackageDetailModel {
       itemId: map['item_id'] as int,
       quantity: map['quantity'] as int? ?? 1,
       createdAt: map['created_at'] as String?,
-      itemName: map['item_name'] as String?,
-      itemPrice: map['item_price'] != null ? (map['item_price'] as num).toDouble() : null,
     );
   }
-
-  Map<String, dynamic> toJson() => toMap();
-  factory PackageDetailModel.fromJson(Map<String, dynamic> json) => PackageDetailModel.fromMap(json);
 }

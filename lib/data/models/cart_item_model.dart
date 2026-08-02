@@ -1,3 +1,4 @@
+// lib/data/models/cart_item_model.dart
 class CartItemModel {
   final String itemType; // 'product', 'service', 'package'
   final int itemId;
