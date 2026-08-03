@@ -204,6 +204,19 @@ class DatabaseHelper {
       )
     ''');
 
+    await db.execute('''
+      CREATE TABLE qris_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        merchant_name TEXT DEFAULT 'Salon Cantik',
+        merchant_id TEXT DEFAULT '',
+        qris_image_path TEXT DEFAULT '',
+        qris_description TEXT DEFAULT 'Pembayaran QRIS',
+        is_active INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    ''');
+
     // ========== INDEXES (NEW) ==========
     await db.execute('CREATE INDEX idx_transactions_date ON $TABLE_TRANSACTIONS(transaction_date)');
     await db.execute('CREATE INDEX idx_transactions_status ON $TABLE_TRANSACTIONS(status)');

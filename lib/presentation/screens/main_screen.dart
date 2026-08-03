@@ -38,37 +38,86 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    // ✅ Tambahkan observer untuk lifecycle
     WidgetsBinding.instance.addObserver(this);
-    // ✅ Gunakan addPostFrameCallback untuk memastikan orientasi diatur setelah build
+    
+    // ✅ Set orientasi portrait saat pertama kali masuk MainScreen
+    // Gunakan post-frame callback untuk memastikan sudah build dulu
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _setPortrait();
+      _lockPortrait();
     });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    // Kembalikan ke portrait saat keluar
+    _lockPortrait();
     super.dispose();
   }
 
+  // ✅ Handle app lifecycle
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _setPortrait();
+      // Saat aplikasi resume, pastikan orientasi sesuai tab
+      if (_currentIndex == 2) {
+        _unlockOrientation();
+      } else {
+        _lockPortrait();
+      }
     }
   }
 
-  @override
-  Future<bool> didPopRoute() async {
-    _setPortrait();
-    return super.didPopRoute();
-  }
-
-  void _setPortrait() {
+  void _lockPortrait() {
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
+  }
+
+  void _unlockOrientation() {
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+  }
+
+  void _onTabChanged(int index) {
+    // ✅ KALAU SUDAH DI TAB YANG SAMA, JANGAN UBAH ORIENTASI
+    if (_currentIndex == index) return;
+    
+    setState(() {
+      _currentIndex = index;
+    });
+    
+    // ✅ Hanya izinkan landscape untuk halaman Transaction (index 2)
+    if (index == 2) {
+      _unlockOrientation();
+    } else {
+      _lockPortrait();
+    }
+  }
+
+  void _navigateToTransaction() {
+    // ✅ Izinkan semua orientasi saat buka Transaction
+    _unlockOrientation();
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TransactionScreen()),
+    ).then((_) {
+      if (!mounted) return;
+      
+      // ✅ Kembalikan ke orientasi sesuai halaman saat ini
+      if (_currentIndex == 2) {
+        _unlockOrientation();
+      } else {
+        _lockPortrait();
+      }
+    });
   }
 
   @override
@@ -314,11 +363,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     final isActive = _currentIndex == index;
     
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _currentIndex = index;
-        });
-      },
+      onTap: () => _onTabChanged(index),
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -366,14 +411,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   Widget _buildCenterButton() {
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const TransactionScreen()),
-        ).then((_) {
-          _setPortrait();
-        });
-      },
+      onTap: _navigateToTransaction,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

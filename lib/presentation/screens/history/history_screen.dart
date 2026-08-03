@@ -4,6 +4,7 @@ import 'package:salon_desk/core/theme/app_colors.dart';
 import 'package:salon_desk/data/controller/history_controller.dart';
 import 'package:salon_desk/data/models/transaction_model.dart';
 import 'package:salon_desk/presentation/screens/settings/printer/printer_screen.dart';
+import 'package:intl/intl.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -28,6 +29,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
     setState(() => _isLoading = true);
     await _controller.loadTransactions();
     setState(() => _isLoading = false);
+  }
+
+  // ✅ Method untuk refresh (dipanggil oleh RefreshIndicator)
+  Future<void> _onRefresh() async {
+    await _controller.loadTransactions();
+    // Re-apply filter setelah refresh
+    _controller.filterTransactions(_selectedFilter);
   }
 
   Future<void> _printReceipt(TransactionModel transaction) async {
@@ -58,7 +66,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9FE),
-      body: _isLoading
+      body: _isLoading && _controller.filteredTransactions.isEmpty
           ? const Center(
               child: CircularProgressIndicator(
                 color: Color(0xFF7E0092),
@@ -72,7 +80,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 // Filter Chips
                 _buildFilterChips(),
                 
-                // Transaction List
+                // Transaction List with RefreshIndicator
                 Expanded(
                   child: _buildTransactionList(),
                 ),
@@ -149,7 +157,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget _buildTransactionList() {
     final transactions = _controller.filteredTransactions;
     
-    if (transactions.isEmpty) {
+    if (transactions.isEmpty && !_isLoading) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -176,15 +184,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 color: const Color(0xFF837281),
               ),
             ),
+            const SizedBox(height: 24),
+            // ✅ Tambahkan tombol refresh manual
+            TextButton.icon(
+              onPressed: _onRefresh,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Muat Ulang'),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF7E0092),
+              ),
+            ),
           ],
         ),
       );
     }
 
+    // ✅ RefreshIndicator membungkus ListView
     return RefreshIndicator(
-      onRefresh: _loadData,
+      onRefresh: _onRefresh,
       color: const Color(0xFF7E0092),
+      backgroundColor: Colors.white,
+      displacement: 40,
       child: ListView.builder(
+        // ✅ Penting: physics harus AlwaysScrollableScrollPhysics agar 
+        // RefreshIndicator bisa dipicu meskipun konten tidak penuh
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(16),
         itemCount: transactions.length,
         itemBuilder: (context, index) {
@@ -198,6 +222,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget _buildTransactionCard(TransactionModel transaction) {
     final isRefunded = transaction.status == 'refunded';
     final isPaid = transaction.status == 'completed';
+    final isQRIS = transaction.paymentMethod == 'qris';
+    
     final statusColor = isRefunded 
         ? const Color(0xFFBA1A1A) 
         : isPaid 
@@ -222,6 +248,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     // Get item count
     final itemCount = transaction.items?.length ?? 0;
+    
+    // Payment method icon & label
+    final paymentIcon = isQRIS ? Icons.qr_code_rounded : Icons.payments_rounded;
+    final paymentLabel = isQRIS ? 'QRIS' : transaction.paymentMethod;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -277,12 +307,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   children: [
                     Row(
                       children: [
-                        Text(
-                          transaction.invoiceNumber,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1A1C1F),
+                        Flexible(
+                          child: Text(
+                            transaction.invoiceNumber,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1A1C1F),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -313,12 +347,42 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      '${itemCount} item dalam transaksi',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF837281),
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          '$itemCount item',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF837281),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // ✅ Payment method badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: isQRIS 
+                                ? const Color(0xFFE8F5E9) 
+                                : const Color(0xFFFFF3E0),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(paymentIcon, size: 10, color: isQRIS ? const Color(0xFF4CAF50) : const Color(0xFFFF9800)),
+                              const SizedBox(width: 2),
+                              Text(
+                                paymentLabel,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w600,
+                                  color: isQRIS ? const Color(0xFF4CAF50) : const Color(0xFFFF9800),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -346,7 +410,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     ),
                   ),
                   Text(
-                    'Rp ${transaction.grandTotal.toStringAsFixed(0)}',
+                    'Rp ${NumberFormat('#,###').format(transaction.grandTotal)}',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
@@ -396,3 +460,4 @@ class _HistoryScreenState extends State<HistoryScreen> {
     super.dispose();
   }
 }
+

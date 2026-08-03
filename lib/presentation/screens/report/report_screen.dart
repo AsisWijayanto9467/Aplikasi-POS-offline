@@ -21,7 +21,6 @@ class _ReportScreenState extends State<ReportScreen> {
   void initState() {
     super.initState();
     _controller = ReportController();
-    // ✅ Tambahkan listener
     _controller.addListener(_onControllerUpdate);
     _loadData();
   }
@@ -49,41 +48,34 @@ class _ReportScreenState extends State<ReportScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9FE),
-      body:
-          _isLoading
-              ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFF7E0092)),
-              )
-              : SingleChildScrollView(
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF7E0092)),
+            )
+          : RefreshIndicator(
+              onRefresh: _loadData,
+              color: const Color(0xFF7E0092),
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header
                     _buildHeader(),
                     const SizedBox(height: 16),
-
-                    // Metric Cards - Stacked
                     _buildMetricCards(),
                     const SizedBox(height: 16),
-
-                    // Chart Section
                     _buildChartSection(),
                     const SizedBox(height: 16),
-
-                    // Top Products
                     _buildTopProducts(),
                     const SizedBox(height: 16),
-
-                    // Top Services
                     _buildTopServices(),
                     const SizedBox(height: 16),
-
-                    // Top Packages
                     _buildTopPackages(),
                   ],
                 ),
               ),
+            ),
     );
   }
 
@@ -94,19 +86,22 @@ class _ReportScreenState extends State<ReportScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Laporan Penjualan',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF1A1C1F),
-          ),
-        ),
         const SizedBox(height: 4),
         Text(
           'Performa penjualan untuk $monthName',
           style: TextStyle(fontSize: 13, color: const Color(0xFF837281)),
         ),
+        if (_controller.lastUpdated != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Terakhir diperbarui: ${DateFormat('HH:mm:ss').format(_controller.lastUpdated!)}',
+              style: const TextStyle(
+                fontSize: 11,
+                color: Color(0xFF837281),
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -203,13 +198,8 @@ class _ReportScreenState extends State<ReportScreen> {
                 Row(
                   children: [
                     Icon(
-                      isPositive
-                          ? Icons.trending_up_rounded
-                          : Icons.trending_down_rounded,
-                      color:
-                          isPositive
-                              ? const Color(0xFF2E7D32)
-                              : const Color(0xFFBA1A1A),
+                      isPositive ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                      color: isPositive ? const Color(0xFF2E7D32) : const Color(0xFFBA1A1A),
                       size: 14,
                     ),
                     const SizedBox(width: 2),
@@ -218,10 +208,7 @@ class _ReportScreenState extends State<ReportScreen> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
-                        color:
-                            isPositive
-                                ? const Color(0xFF2E7D32)
-                                : const Color(0xFFBA1A1A),
+                        color: isPositive ? const Color(0xFF2E7D32) : const Color(0xFFBA1A1A),
                       ),
                     ),
                     const SizedBox(width: 4),
@@ -275,7 +262,6 @@ class _ReportScreenState extends State<ReportScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          // Scrollable chart
           SizedBox(
             height: 200,
             child: SingleChildScrollView(
@@ -308,50 +294,41 @@ class _ReportScreenState extends State<ReportScreen> {
         border: Border.all(color: const Color(0xFFE2E2E7), width: 1),
       ),
       child: Row(
-        children:
-            periods.map((period) {
-              final isSelected = _selectedPeriod == period;
-              return GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _selectedPeriod = period;
-                  });
-                  _controller.loadChartData(period);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected ? Colors.white : Colors.transparent,
-                    borderRadius: BorderRadius.circular(6),
-                    boxShadow:
-                        isSelected
-                            ? [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.04),
-                                blurRadius: 4,
-                                offset: const Offset(0, 1),
-                              ),
-                            ]
-                            : null,
-                  ),
-                  child: Text(
-                    period,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight:
-                          isSelected ? FontWeight.w600 : FontWeight.w400,
-                      color:
-                          isSelected
-                              ? const Color(0xFF7E0092)
-                              : const Color(0xFF514250),
-                    ),
-                  ),
+        children: periods.map((period) {
+          final isSelected = _selectedPeriod == period;
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedPeriod = period;
+              });
+              _controller.loadChartData(period);
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.white : Colors.transparent,
+                borderRadius: BorderRadius.circular(6),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Text(
+                period,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  color: isSelected ? const Color(0xFF7E0092) : const Color(0xFF514250),
                 ),
-              );
-            }).toList(),
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -446,30 +423,26 @@ class _ReportScreenState extends State<ReportScreen> {
           },
         ),
         borderData: FlBorderData(show: false),
-        barGroups:
-            data.asMap().entries.map((entry) {
-              final index = entry.key;
-              final value = entry.value;
-              final isHighest = value == maxValue;
+        barGroups: data.asMap().entries.map((entry) {
+          final index = entry.key;
+          final value = entry.value;
+          final isHighest = value == maxValue;
 
-              return BarChartGroupData(
-                x: index,
-                barRods: [
-                  BarChartRodData(
-                    toY: value,
-                    color:
-                        isHighest
-                            ? const Color(0xFF7E0092)
-                            : const Color(0xFF9A25AE).withOpacity(0.6),
-                    width: 24,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(4),
-                      topRight: Radius.circular(4),
-                    ),
-                  ),
-                ],
-              );
-            }).toList(),
+          return BarChartGroupData(
+            x: index,
+            barRods: [
+              BarChartRodData(
+                toY: value,
+                color: isHighest ? const Color(0xFF7E0092) : const Color(0xFF9A25AE).withOpacity(0.6),
+                width: 24,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(4),
+                  topRight: Radius.circular(4),
+                ),
+              ),
+            ],
+          );
+        }).toList(),
       ),
     );
   }
@@ -483,25 +456,14 @@ class _ReportScreenState extends State<ReportScreen> {
       return List.generate(days, (index) => '${index + 1}');
     }
     return [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'Mei',
-      'Jun',
-      'Jul',
-      'Agu',
-      'Sep',
-      'Okt',
-      'Nov',
-      'Des',
+      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
     ];
   }
 
   // ========== TOP PRODUCTS ==========
   Widget _buildTopProducts() {
-    final products =
-        _controller.topProducts.where((p) => p['type'] == 'product').toList();
+    final products = _controller.topProducts.where((p) => p['type'] == 'product').toList();
     return _buildTopSection(
       title: 'Produk Terlaris',
       icon: Icons.inventory_2_rounded,
@@ -512,8 +474,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
   // ========== TOP SERVICES ==========
   Widget _buildTopServices() {
-    final services =
-        _controller.topProducts.where((p) => p['type'] == 'service').toList();
+    final services = _controller.topProducts.where((p) => p['type'] == 'service').toList();
     return _buildTopSection(
       title: 'Layanan Terlaris',
       icon: Icons.build_rounded,
@@ -524,8 +485,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
   // ========== TOP PACKAGES ==========
   Widget _buildTopPackages() {
-    final packages =
-        _controller.topProducts.where((p) => p['type'] == 'package').toList();
+    final packages = _controller.topProducts.where((p) => p['type'] == 'package').toList();
     return _buildTopSection(
       title: 'Paket Terlaris',
       icon: Icons.auto_awesome_motion_rounded,
@@ -615,7 +575,6 @@ class _ReportScreenState extends State<ReportScreen> {
       ),
       child: Row(
         children: [
-          // Gambar / Icon
           Container(
             width: 40,
             height: 40,
@@ -681,5 +640,4 @@ class _ReportScreenState extends State<ReportScreen> {
       ),
     );
   }
-
 }

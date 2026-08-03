@@ -20,6 +20,7 @@ class ReportController extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   String _selectedPeriod = 'Week';
+  DateTime? _lastUpdated;
 
   // Getters
   double get totalSales => _totalSales;
@@ -32,6 +33,7 @@ class ReportController extends ChangeNotifier {
   List<Map<String, dynamic>> get topProducts => _topProducts;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  DateTime? get lastUpdated => _lastUpdated;
 
   void setSelectedPeriod(String period) {
     _selectedPeriod = period;
@@ -53,7 +55,7 @@ class ReportController extends ChangeNotifier {
         WHERE transaction_date IS NULL
       ''');
 
-      // ✅ AMBIL SEMUA DATA TRANSAKSI (sama seperti history)
+      // ✅ AMBIL SEMUA DATA TRANSAKSI
       final result = await db.rawQuery('''
         SELECT * FROM ${DatabaseHelper.TABLE_TRANSACTIONS}
         WHERE status = 'completed'
@@ -124,6 +126,7 @@ class ReportController extends ChangeNotifier {
       // ========== LOAD TOP PRODUCTS ==========
       await _loadTopProducts(db);
 
+      _lastUpdated = DateTime.now();
       notifyListeners();
 
     } catch (e) {
@@ -189,10 +192,12 @@ class ReportController extends ChangeNotifier {
       }
       
       print('Chart data: $_chartData');
+      _lastUpdated = DateTime.now();
       notifyListeners();
     } catch (e) {
       print('Error building chart data: $e');
       _chartData = [];
+      _lastUpdated = DateTime.now();
       notifyListeners();
     }
   }
@@ -232,10 +237,12 @@ class ReportController extends ChangeNotifier {
         _topProducts = [];
       }
       
+      _lastUpdated = DateTime.now();
       notifyListeners();
     } catch (e) {
       print('Error loading top products: $e');
       _topProducts = [];
+      _lastUpdated = DateTime.now();
       notifyListeners();
     }
   }

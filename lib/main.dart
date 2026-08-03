@@ -1,25 +1,35 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:salon_desk/presentation/screens/main_screen.dart';
+import 'package:salon_desk/presentation/screens/splash_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // ========== HAPUS DATABASE LAMA ==========
   // await _deleteDatabase();
+
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
   
-  // ✅ Panggil fungsi request permissions
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+    ),
+  );
+  
   await _requestPermissions();
 
   runApp(const MyApp());
 }
 
-// ✅ TAMBAHKAN FUNGSI INI
 Future<void> _requestPermissions() async {
   try {
-    // Request semua permission yang diperlukan
     final permissions = await [
       Permission.bluetooth,
       Permission.bluetoothScan,
@@ -28,7 +38,6 @@ Future<void> _requestPermissions() async {
       Permission.storage,
     ].request();
     
-    // Cek status permission
     bool allGranted = true;
     permissions.forEach((permission, status) {
       if (!status.isGranted && !status.isPermanentlyDenied) {
@@ -70,7 +79,7 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.purple,
         useMaterial3: true,
       ),
-      home: const MainScreen(),
+      home: const SplashScreen(),
     );
   }
 }

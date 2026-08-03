@@ -1,7 +1,10 @@
 // lib/presentation/pages/transaction/widgets/payment_page.dart
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:salon_desk/data/controller/transaction_controller.dart';
-
+import 'package:salon_desk/data/database/database_helper.dart';
+import 'package:salon_desk/data/models/qris_model.dart';
+import 'package:salon_desk/presentation/screens/settings/qris/qris_screen.dart';
 class PaymentPage extends StatefulWidget {
   final TransactionController controller;
   final VoidCallback onSuccess;
@@ -24,12 +27,17 @@ class _PaymentPageState extends State<PaymentPage> {
   // Menggunakan String sebagai buffer lokal untuk mengelola input kalkulator dengan presisi
   String _cashDisplay = '0';
 
+  // ✅ QRIS variables
+  QrisModel? _qrisModel;
+  bool _isLoadingQRIS = false;
+
   @override
   void initState() {
     super.initState();
     _customerController.text = widget.controller.customerName;
     widget.controller.addListener(_onControllerUpdate);
     _syncCashFromController();
+    _loadQRIS(); // ✅ Load QRIS saat init
   }
 
   @override
@@ -41,7 +49,6 @@ class _PaymentPageState extends State<PaymentPage> {
 
   void _onControllerUpdate() {
     if (mounted) {
-      // Sinkronkan tampilan jika nilai controller berubah dari luar (misal: reset atau tombol Uang Pas)
       final controllerVal = widget.controller.cashAmount;
       if (double.tryParse(_cashDisplay) != controllerVal) {
         _syncCashFromController();
@@ -54,6 +61,33 @@ class _PaymentPageState extends State<PaymentPage> {
   void _syncCashFromController() {
     final amount = widget.controller.cashAmount;
     _cashDisplay = amount == 0 ? '0' : amount.toStringAsFixed(0);
+  }
+
+  Future<void> _loadQRIS() async {
+    try {
+      setState(() => _isLoadingQRIS = true);
+      
+      final db = await DatabaseHelper.database;
+      final result = await db.query(
+        'qris_settings',
+        where: 'is_active = 1',
+        limit: 1,
+      );
+
+      if (result.isNotEmpty && mounted) {
+        setState(() {
+          _qrisModel = QrisModel.fromMap(result.first);  // ✅ QrisModel.fromMap, bukan _qrisModel.fromMap
+          _isLoadingQRIS = false;
+        });
+      } else {
+        setState(() => _isLoadingQRIS = false);
+      }
+    } catch (e) {
+      debugPrint('Error loading QRIS: $e');
+      if (mounted) {
+        setState(() => _isLoadingQRIS = false);
+      }
+    }
   }
 
   /// Menangani pengetikan keypad kalkulator
@@ -90,7 +124,6 @@ class _PaymentPageState extends State<PaymentPage> {
         }
       }
 
-      // Update nilai angka ke controller
       final parsedValue = double.tryParse(_cashDisplay) ?? 0.0;
       widget.controller.setCashAmount(parsedValue);
     });
@@ -136,6 +169,7 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
+  // ========== ORDER SUMMARY ==========
   Widget _buildOrderSummary() {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -244,6 +278,7 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
+  // ========== PAYMENT METHOD ==========
   Widget _buildPaymentMethod() {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -284,6 +319,7 @@ class _PaymentPageState extends State<PaymentPage> {
           ),
           const SizedBox(height: 8),
           if (widget.controller.selectedPaymentMethod == 'cash') ...[
+            // ===== CASH SECTION =====
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -392,58 +428,85 @@ class _PaymentPageState extends State<PaymentPage> {
               ),
             ),
           ] else ...[
+            // ===== QRIS SECTION =====
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: const Color(0xFFF5F5F5),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
                 children: [
-                  const Text(
-                    'Grand Total',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF514250),
-                    ),
+                  // Total yang harus dibayar
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Total Pembayaran',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF514250),
+                        ),
+                      ),
+                      Text(
+                        'Rp ${widget.controller.total.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF7E0092),
+                        ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    'Rp ${widget.controller.total.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF7E0092),
+                  const SizedBox(height: 8),
+                  // Instruksi untuk kasir
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFFFF9800).withOpacity(0.3),
+                      ),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.info_rounded, color: Color(0xFFFF9800), size: 16),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Tunggu customer menyelesaikan pembayaran sebelum konfirmasi',
+                            style: TextStyle(fontSize: 11, color: Color(0xFFE65100)),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 8),
+            // Tombol konfirmasi dengan teks yang lebih jelas
             Expanded(
               child: Align(
                 alignment: Alignment.bottomCenter,
                 child: SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _canConfirm() ? _handleConfirmPayment : null,
+                  child: ElevatedButton.icon(
+                    onPressed: _handleConfirmPayment,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _canConfirm()
-                          ? const Color(0xFF7E0092)
-                          : const Color(0xFFE2E2E7),
+                      backgroundColor: const Color(0xFF4CAF50),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: Text(
-                      _canConfirm() ? 'Konfirmasi & Bayar' : 'Lengkapi Pembayaran',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    icon: const Icon(Icons.check_circle_rounded, size: 20),
+                    label: const Text(
+                      'Konfirmasi Pembayaran QRIS',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ),
@@ -497,6 +560,7 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
+  // ========== CALCULATOR ==========
   Widget _buildCalculator() {
     return Container(
       padding: const EdgeInsets.all(10),
@@ -514,7 +578,6 @@ class _PaymentPageState extends State<PaymentPage> {
       ),
       child: Column(
         children: [
-          // Display Kalkulator
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
@@ -530,25 +593,16 @@ class _PaymentPageState extends State<PaymentPage> {
               children: [
                 const Text(
                   'Jumlah Bayar',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF514250),
-                  ),
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Color(0xFF514250)),
                 ),
                 Text(
                   'Rp $_cashDisplay',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF7E0092),
-                  ),
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF7E0092)),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 6),
-          // Number Pad
           Expanded(
             child: GridView.count(
               shrinkWrap: true,
@@ -575,13 +629,9 @@ class _PaymentPageState extends State<PaymentPage> {
           const SizedBox(height: 4),
           Row(
             children: [
-              Expanded(
-                child: _buildNumberButton('00', isZero: true),
-              ),
+              Expanded(child: _buildNumberButton('00', isZero: true)),
               const SizedBox(width: 4),
-              Expanded(
-                child: _buildNumberButton('.', isDot: true),
-              ),
+              Expanded(child: _buildNumberButton('.', isDot: true)),
             ],
           ),
           const SizedBox(height: 4),
@@ -600,19 +650,10 @@ class _PaymentPageState extends State<PaymentPage> {
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
-                  side: BorderSide(
-                    color: const Color(0xFF2E7D32).withOpacity(0.3),
-                    width: 1,
-                  ),
+                  side: BorderSide(color: const Color(0xFF2E7D32).withOpacity(0.3), width: 1),
                 ),
               ),
-              child: const Text(
-                'Uang Pas',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              child: const Text('Uang Pas', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
             ),
           ),
         ],
@@ -664,9 +705,13 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  Widget _buildQRISDisplay() {
+  // ========== QRIS DISPLAY (UPGRADED) ==========
+   Widget _buildQRISDisplay() {
+    final hasQRIS = _qrisModel != null && _qrisModel!.hasQRISImage;
+    final isComplete = _qrisModel?.isComplete ?? false;
+
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
@@ -683,78 +728,249 @@ class _PaymentPageState extends State<PaymentPage> {
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text(
-            'Scan QRIS',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1A1C1F),
-            ),
-          ),
-          const SizedBox(height: 8),
+          // Header dengan instruksi
           Container(
-            width: 140,
-            height: 140,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: const Color(0xFFE2E2E7),
-                width: 1,
-              ),
+              color: const Color(0xFF7E0092).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(6),
             ),
-            child: Center(
-              child: Icon(
-                Icons.qr_code_scanner_rounded,
-                size: 70,
-                color: const Color(0xFF7E0092).withOpacity(0.3),
-              ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.qr_code_scanner_rounded, color: Color(0xFF7E0092), size: 16),
+                SizedBox(width: 4),
+                Text(
+                  'Scan QRIS',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF7E0092)),
+                ),
+              ],
             ),
           ),
+          
           const SizedBox(height: 8),
-          Text(
-            'Total: Rp ${widget.controller.total.toStringAsFixed(0)}',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF7E0092),
-            ),
+          
+          // QR Code Container - DIPERBESAR
+          Expanded(
+            child: _isLoadingQRIS
+                ? Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE2E2E7), width: 1),
+                    ),
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFF7E0092),
+                      ),
+                    ),
+                  )
+                : GestureDetector(
+                    onTap: !hasQRIS ? () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const QrisScreen()),
+                      ).then((_) => _loadQRIS());
+                    } : null,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: hasQRIS ? const Color(0xFF4CAF50).withOpacity(0.5) : const Color(0xFFE2E2E7),
+                          width: hasQRIS ? 1.5 : 1,
+                        ),
+                      ),
+                      child: hasQRIS
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.file(
+                                File(_qrisModel!.qrisImagePath),
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return _buildPlaceholderQR();
+                                },
+                              ),
+                            )
+                          : _buildPlaceholderQR(),
+                    ),
+                  ),
           ),
-          const SizedBox(height: 4),
-          const Text(
-            'Scan QRIS untuk melakukan pembayaran',
-            style: TextStyle(
-              fontSize: 10,
-              color: Color(0xFF837281),
-            ),
-            textAlign: TextAlign.center,
+          
+          const SizedBox(height: 6),
+          
+          // Status indicator saja (tanpa teks panjang)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: isComplete ? const Color(0xFF4CAF50) : const Color(0xFFFF9800),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                isComplete ? 'Siap' : 'Belum Siap',
+                style: TextStyle(
+                  fontSize: 9,
+                  color: isComplete ? const Color(0xFF4CAF50) : const Color(0xFFFF9800),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
+  Widget _buildPlaceholderQR() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.qr_code_2_rounded,
+            size: 60,
+            color: const Color(0xFF7E0092).withOpacity(0.3),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'QRIS belum diatur',
+            style: TextStyle(fontSize: 11, color: Color(0xFF837281)),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 6),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const QrisScreen()),
+              ).then((_) => _loadQRIS());
+            },
+            child: const Text(
+              'Upload di Pengaturan',
+              style: TextStyle(
+                fontSize: 10,
+                color: Color(0xFF7E0092),
+                fontWeight: FontWeight.w600,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // ========== CONFIRMATION ==========
   bool _canConfirm() {
     if (widget.controller.isCartEmpty) return false;
     if (widget.controller.selectedPaymentMethod == 'cash') {
       return widget.controller.cashAmount >= widget.controller.total;
     }
+    // QRIS: selalu bisa dikonfirmasi (kasir yang verifikasi pembayaran)
     return true;
   }
 
   Future<void> _handleConfirmPayment() async {
-    final success = await widget.controller.saveTransaction();
-    if (success) {
-      widget.onSuccess();
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(widget.controller.error ?? 'Gagal menyimpan transaksi'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    // Untuk QRIS, bisa tambahkan dialog konfirmasi
+    if (widget.controller.selectedPaymentMethod == 'qris') {
+      final confirmed = await _showQRISConfirmationDialog();
+      if (confirmed != true) return;
     }
+
+    final success = await widget.controller.saveTransaction();
+    if (success && mounted) {
+      widget.onSuccess();
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(widget.controller.error ?? 'Gagal menyimpan transaksi'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // ✅ Dialog konfirmasi untuk QRIS
+  Future<bool?> _showQRISConfirmationDialog() {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.qr_code_rounded, color: Color(0xFF7E0092), size: 24),
+            SizedBox(width: 8),
+            Text('Konfirmasi QRIS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Pastikan customer telah menyelesaikan pembayaran:'),
+            const SizedBox(height: 12),
+            _buildCheckItem('Customer sudah scan QRIS'),
+            _buildCheckItem('Customer sudah melakukan pembayaran'),
+            _buildCheckItem('Customer menunjukkan bukti pembayaran'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3E0),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Color(0xFFFF9800), size: 16),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Konfirmasi tanpa verifikasi dapat menyebabkan kerugian!',
+                      style: TextStyle(fontSize: 11, color: Color(0xFFE65100)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal', style: TextStyle(color: Color(0xFF837281))),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.check_circle_rounded, size: 18),
+            label: const Text('Ya, Konfirmasi'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4CAF50),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCheckItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle_outline_rounded, size: 18, color: Color(0xFF837281)),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 13, color: Color(0xFF1A1C1F)))),
+        ],
+      ),
+    );
   }
 }

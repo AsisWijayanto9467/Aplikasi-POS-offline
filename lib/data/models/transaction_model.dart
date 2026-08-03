@@ -1,3 +1,4 @@
+// lib/data/models/transaction_model.dart
 import 'transaction_item_model.dart';
 
 class TransactionModel {
@@ -13,7 +14,7 @@ class TransactionModel {
   final String qrisImagePath;
   final String status;
   final String cashierName;
-  final String customerName; // ← NEW
+  final String customerName;
   final String notes;
   final String? transactionDate;
   final String? createdAt;
@@ -33,15 +34,16 @@ class TransactionModel {
     this.qrisImagePath = '',
     this.status = 'pending',
     this.cashierName = 'Kasir',
-    this.customerName = '', // ← NEW
+    this.customerName = '',
     this.notes = '',
     this.transactionDate,
     this.createdAt,
     this.items,
   });
 
+  // ✅ PERBAIKAN: toMap() hanya tambahkan transaction_date jika tidak null
   Map<String, dynamic> toMap() {
-    return {
+    final map = {
       'id': id,
       'invoice_number': invoiceNumber,
       'total_amount': totalAmount,
@@ -54,11 +56,17 @@ class TransactionModel {
       'qris_image_path': qrisImagePath,
       'status': status,
       'cashier_name': cashierName,
-      'customer_name': customerName, // ← NEW
+      'customer_name': customerName,
       'notes': notes,
-      'transaction_date': transactionDate,
       'created_at': createdAt,
     };
+    
+    // ✅ Hanya tambahkan transaction_date jika tidak null
+    if (transactionDate != null) {
+      map['transaction_date'] = transactionDate;
+    }
+    
+    return map;
   }
 
   factory TransactionModel.fromMap(Map<String, dynamic> map) {
@@ -75,7 +83,7 @@ class TransactionModel {
       qrisImagePath: map['qris_image_path'] as String? ?? '',
       status: map['status'] as String? ?? 'pending',
       cashierName: map['cashier_name'] as String? ?? 'Kasir',
-      customerName: map['customer_name'] as String? ?? '', // ← NEW
+      customerName: map['customer_name'] as String? ?? '',
       notes: map['notes'] as String? ?? '',
       transactionDate: map['transaction_date'] as String?,
       createdAt: map['created_at'] as String?,

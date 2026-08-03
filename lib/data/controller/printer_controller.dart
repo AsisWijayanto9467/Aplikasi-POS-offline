@@ -305,7 +305,6 @@ class PrinterController extends ChangeNotifier {
     }
   }
 
-  // ========== SCAN BLUETOOTH DEVICES ==========
   Future<void> scanDevices() async {
     try {
       _isScanning = true;
@@ -321,7 +320,7 @@ class PrinterController extends ChangeNotifier {
         return;
       }
 
-      // ✅ CEK GPS/LOCATION
+      // ✅ CEK GPS/LOCATION (WAJIB untuk Android)
       final hasLocation = await _checkLocationServices();
       if (!hasLocation) {
         _isScanning = false;
@@ -330,84 +329,130 @@ class PrinterController extends ChangeNotifier {
       }
 
       // ✅ CEK BLUETOOTH
-      if (!await FlutterBluePlus.isOn) {
+      final adapterState = await FlutterBluePlus.adapterState.first;
+      if (adapterState != BluetoothAdapterState.on) {
         _error = 'Bluetooth tidak aktif. Silakan aktifkan Bluetooth terlebih dahulu.';
         _isScanning = false;
         notifyListeners();
         return;
       }
 
-      // ✅ AMBIL DEVICE YANG SUDAH DIPAIR
+      // ✅ AMBIL SEMUA DEVICE YANG SUDAH DIPAIR
       try {
         final bondedDevices = await FlutterBluePlus.bondedDevices;
-        print('Bonded devices: ${bondedDevices.length}');
+        print('📱 Bonded devices found: ${bondedDevices.length}');
         for (var device in bondedDevices) {
           if (!_devices.any((d) => d.remoteId == device.remoteId)) {
             _devices.add(device);
-            print('Bonded: ${device.platformName} - ${device.remoteId}');
-            notifyListeners();
+            print('  📎 Bonded: ${device.platformName} - ${device.remoteId}');
           }
         }
+        notifyListeners();
       } catch (e) {
         print('Error getting bonded devices: $e');
       }
 
-      // ✅ PERBAIKAN: Tunggu sebentar sebelum scan
+      // ✅ AMBIL DEVICE YANG SUDAH TERHUBUNG
+      try {
+        final connectedDevices = await FlutterBluePlus.connectedDevices;
+        print('🔗 Connected devices: ${connectedDevices.length}');
+        for (var device in connectedDevices) {
+          if (!_devices.any((d) => d.remoteId == device.remoteId)) {
+            _devices.add(device);
+            print('  🔌 Connected: ${device.platformName} - ${device.remoteId}');
+          }
+        }
+        notifyListeners();
+      } catch (e) {
+        print('Error getting connected devices: $e');
+      }
+
+      // ✅ TUNGGU SEBENTAR SEBELUM SCAN
       await Future.delayed(const Duration(milliseconds: 500));
 
-      // ✅ STOP SCAN SEBELUMNYA
+      // ✅ STOP SCAN SEBELUMNYA (JIKA ADA)
       try {
         await FlutterBluePlus.stopScan();
       } catch (e) {
         // Ignore
       }
 
-      // ✅ START SCAN
+      // ✅ START SCAN DENGAN TIMEOUT LEBIH LAMA
+      // DAN TANPA FILTER AGAR MENDAPATKAN SEMUA DEVICE
+      print('🔍 Starting Bluetooth scan...');
+      
       try {
         await FlutterBluePlus.startScan(
-          timeout: const Duration(seconds: 20),
+          timeout: const Duration(seconds: 30), // ⬆️ Naikkan timeout
+          // ❌ JANGAN gunakan withServices filter agar semua device terdeteksi
+          // withServices: [Guid('00001101-0000-1000-8000-00805F9B34FB')],
         );
+        print('✅ Scan started successfully');
       } catch (e) {
-        print('Error starting scan: $e');
-        _error = 'Gagal memulai scan Bluetooth: $e';
+        print('❌ Error starting scan: $e');
+        _error = 'Gagal memulai scan Bluetooth. Coba restart Bluetooth HP Anda.';
         _isScanning = false;
         notifyListeners();
         return;
       }
 
-      // ✅ LISTEN SCAN RESULTS
-      _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
-        for (ScanResult result in results) {
-          final device = result.device;
-          if (!_devices.any((d) => d.remoteId == device.remoteId)) {
-            _devices.add(device);
-            print('Device ditemukan: ${device.platformName} - ${device.remoteId}');
-            notifyListeners();
+      // ✅ LISTEN SCAN RESULTS - TAMPILKAN SEMUA DEVICE
+      _scanSubscription = FlutterBluePlus.scanResults.listen(
+        (results) {
+          print('📡 Scan results received: ${results.length} devices');
+          
+          for (ScanResult result in results) {
+            final device = result.device;
+            final rssi = result.rssi; // Signal strength
+            final manufacturerData = result.advertisementData.manufacturerData;
+            final serviceUuids = result.advertisementData.serviceUuids;
+            
+            // ✅ Print detail device untuk debugging
+            print('  📻 Found: ${device.platformName}');
+            print('     Address: ${device.remoteId}');
+            print('     RSSI: $rssi dBm');
+            print('     Service UUIDs: $serviceUuids');
+            
+            // ✅ Tambahkan SEMUA device (tidak hanya printer)
+            if (!_devices.any((d) => d.remoteId == device.remoteId)) {
+              _devices.add(device);
+              notifyListeners();
+              print('     ✅ Added to list');
+            }
           }
-        }
-      });
+        },
+        onError: (error) {
+          print('❌ Scan error: $error');
+        },
+      );
 
-      // ✅ AUTO STOP
-      Future.delayed(const Duration(seconds: 20), () async {
-        try {
-          await FlutterBluePlus.stopScan();
-        } catch (e) {
-          // Ignore
-        }
-        _scanSubscription?.cancel();
-        _isScanning = false;
-        print('Scan selesai, ditemukan ${_devices.length} device');
-        notifyListeners();
+      // ✅ AUTO STOP SETELAH TIMEOUT
+      Future.delayed(const Duration(seconds: 30), () async {
+        await stopScan();
       });
 
     } catch (e) {
-      print('Error scan: $e');
+      print('❌ Error scan: $e');
       _error = 'Error scanning: $e';
       _isScanning = false;
       notifyListeners();
     }
   }
 
+  // ✅ Method untuk stop scan
+  Future<void> stopScan() async {
+    try {
+      await FlutterBluePlus.stopScan();
+      print('🛑 Scan stopped');
+    } catch (e) {
+      print('Error stopping scan: $e');
+    }
+    _scanSubscription?.cancel();
+    _isScanning = false;
+    print('📊 Total devices found: ${_devices.length}');
+    notifyListeners();
+  }
+  
   // ========== CONNECT TO PRINTER ==========
   Future<bool> connectToDevice(BluetoothDevice device) async {
     try {
