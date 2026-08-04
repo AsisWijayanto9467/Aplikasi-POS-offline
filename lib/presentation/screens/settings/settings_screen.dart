@@ -7,7 +7,6 @@ import 'package:salon_desk/presentation/screens/settings/products/products_scree
 import 'package:salon_desk/presentation/screens/settings/qris/qris_screen.dart';
 import 'package:salon_desk/presentation/screens/settings/salon_info/salon_info_screen.dart';
 import 'package:salon_desk/presentation/screens/settings/services/services_screen.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 
 class SettingsScreen extends StatelessWidget {

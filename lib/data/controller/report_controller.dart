@@ -1,6 +1,7 @@
 // lib/data/controller/report_controller.dart
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:intl/intl.dart'; // ✅ Tambahkan import intl
 import 'package:salon_desk/data/database/database_helper.dart';
 import 'package:salon_desk/data/models/transaction_model.dart';
 import 'package:salon_desk/data/models/transaction_item_model.dart';
@@ -39,6 +40,36 @@ class ReportController extends ChangeNotifier {
     _selectedPeriod = period;
   }
 
+  // ✅ METHOD UNTUK EXPORT
+  Map<String, dynamic> getReportDataForExport(String period) {
+    return {
+      'period': _getPeriodLabel(period),
+      'totalSales': _totalSales,
+      'totalOrders': _totalOrders,
+      'averageBasket': _averageBasket,
+      'salesChange': _salesChange,
+      'ordersChange': _ordersChange,
+      'basketChange': _basketChange,
+      'topProducts': _topProducts,
+      'chartData': _chartData,
+    };
+  }
+
+  // ✅ METHOD PERIOD LABEL
+  String _getPeriodLabel(String period) {
+    final now = DateTime.now();
+    switch (period) {
+      case 'Week':
+        return '7 Hari Terakhir (${DateFormat('dd MMM').format(now.subtract(const Duration(days: 7)))} - ${DateFormat('dd MMM yyyy').format(now)})';
+      case 'Month':
+        return DateFormat('MMMM yyyy').format(now);
+      case 'Year':
+        return DateFormat('yyyy').format(now);
+      default:
+        return period;
+    }
+  }
+
   // ========== LOAD REPORT DATA ==========
   Future<void> loadReportData() async {
     try {
@@ -48,14 +79,12 @@ class ReportController extends ChangeNotifier {
 
       final db = await DatabaseHelper.database;
 
-      // ✅ PERBAIKI data lama yang transaction_date / created_at NULL
       await db.execute('''
         UPDATE ${DatabaseHelper.TABLE_TRANSACTIONS}
         SET transaction_date = COALESCE(created_at, CURRENT_TIMESTAMP)
         WHERE transaction_date IS NULL
       ''');
 
-      // ✅ AMBIL SEMUA DATA TRANSAKSI
       final result = await db.rawQuery('''
         SELECT * FROM ${DatabaseHelper.TABLE_TRANSACTIONS}
         WHERE status = 'completed'
@@ -64,7 +93,6 @@ class ReportController extends ChangeNotifier {
 
       final transactions = result.map((map) => TransactionModel.fromMap(map)).toList();
       
-      // ✅ Ambil items untuk setiap transaksi
       for (var transaction in transactions) {
         final items = await db.rawQuery('''
           SELECT * FROM ${DatabaseHelper.TABLE_TRANSACTION_ITEMS}
@@ -74,37 +102,29 @@ class ReportController extends ChangeNotifier {
         transaction.items = items.map((map) => TransactionItemModel.fromMap(map)).toList();
       }
 
-      print('Total transactions: ${transactions.length}');
-
-      // ========== HITUNG STATISTIK ==========
       final now = DateTime.now();
       final startOfMonth = DateTime(now.year, now.month, 1);
       final startOfLastMonth = DateTime(now.year, now.month - 1, 1);
 
-      // Filter transaksi bulan ini
       final thisMonthTransactions = transactions.where((t) {
         if (t.transactionDate == null) return false;
         final date = DateTime.parse(t.transactionDate!);
         return date.isAfter(startOfMonth) || date.isAtSameMomentAs(startOfMonth);
       }).toList();
 
-      // Filter transaksi bulan lalu
       final lastMonthTransactions = transactions.where((t) {
         if (t.transactionDate == null) return false;
         final date = DateTime.parse(t.transactionDate!);
         return date.isAfter(startOfLastMonth) && date.isBefore(startOfMonth);
       }).toList();
 
-      // ✅ Hitung total penjualan bulan ini - gunakan 0.0
       _totalSales = thisMonthTransactions.fold(0.0, (sum, t) => sum + t.grandTotal);
       _totalOrders = thisMonthTransactions.length;
       _averageBasket = _totalOrders > 0 ? _totalSales / _totalOrders : 0;
 
-      // ✅ Hitung total penjualan bulan lalu - gunakan 0.0
       final lastTotalSales = lastMonthTransactions.fold(0.0, (sum, t) => sum + t.grandTotal);
       final lastTotalOrders = lastMonthTransactions.length;
       
-      // Hitung perubahan
       _salesChange = lastTotalSales > 0 
           ? ((_totalSales - lastTotalSales) / lastTotalSales) * 100 
           : 0;
@@ -117,13 +137,7 @@ class ReportController extends ChangeNotifier {
           ? ((_averageBasket - lastAverageBasket) / lastAverageBasket) * 100 
           : 0;
 
-      print('This month - Sales: $_totalSales, Orders: $_totalOrders');
-      print('Last month - Sales: $lastTotalSales, Orders: $lastTotalOrders');
-
-      // ========== BUAT CHART DATA ==========
       await _buildChartData(transactions, now);
-
-      // ========== LOAD TOP PRODUCTS ==========
       await _loadTopProducts(db);
 
       _lastUpdated = DateTime.now();
@@ -143,7 +157,6 @@ class ReportController extends ChangeNotifier {
   Future<void> _buildChartData(List<TransactionModel> transactions, DateTime now) async {
     try {
       if (_selectedPeriod == 'Week') {
-        // 7 hari terakhir
         final List<double> dailySales = List.filled(7, 0.0);
         final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
         
@@ -158,7 +171,6 @@ class ReportController extends ChangeNotifier {
         _chartData = dailySales;
         
       } else if (_selectedPeriod == 'Month') {
-        // 30 hari dalam bulan ini
         final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
         final List<double> dailySales = List.filled(daysInMonth, 0.0);
         
@@ -175,7 +187,6 @@ class ReportController extends ChangeNotifier {
         _chartData = dailySales;
         
       } else {
-        // 12 bulan dalam setahun
         final List<double> monthlySales = List.filled(12, 0.0);
         
         for (var t in transactions) {
@@ -191,11 +202,9 @@ class ReportController extends ChangeNotifier {
         _chartData = monthlySales;
       }
       
-      print('Chart data: $_chartData');
       _lastUpdated = DateTime.now();
       notifyListeners();
     } catch (e) {
-      print('Error building chart data: $e');
       _chartData = [];
       _lastUpdated = DateTime.now();
       notifyListeners();
@@ -220,8 +229,6 @@ class ReportController extends ChangeNotifier {
         LIMIT 10
       ''');
 
-      print('Top products result: $result');
-      
       if (result.isNotEmpty && result.first['name'] != null) {
         _topProducts = result.map((row) {
           final type = row['type'] as String? ?? 'product';
@@ -240,7 +247,6 @@ class ReportController extends ChangeNotifier {
       _lastUpdated = DateTime.now();
       notifyListeners();
     } catch (e) {
-      print('Error loading top products: $e');
       _topProducts = [];
       _lastUpdated = DateTime.now();
       notifyListeners();
@@ -249,18 +255,14 @@ class ReportController extends ChangeNotifier {
 
   String _getCategoryLabel(String type) {
     switch (type) {
-      case 'product':
-        return 'Produk';
-      case 'service':
-        return 'Jasa';
-      case 'package':
-        return 'Paket';
-      default:
-        return 'Lainnya';
+      case 'product': return 'Produk';
+      case 'service': return 'Jasa';
+      case 'package': return 'Paket';
+      default: return 'Lainnya';
     }
   }
 
-  // ========== LOAD CHART DATA (untuk period toggle) ==========
+  // ========== LOAD CHART DATA ==========
   Future<void> loadChartData(String period) async {
     _selectedPeriod = period;
     await loadReportData();
