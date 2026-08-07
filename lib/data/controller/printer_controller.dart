@@ -22,6 +22,9 @@ class PrinterController extends ChangeNotifier {
   
   StreamSubscription? _scanSubscription;
 
+  // Konstanta untuk lebar kertas
+  static const int paperWidth = 32; // 32 karakter untuk kertas 58mm
+
   PrinterSettingModel? get settings => _settings;
   bool get isLoading => _isLoading;
   bool get isScanning => _isScanning;
@@ -38,7 +41,6 @@ class PrinterController extends ChangeNotifier {
   // ========== CHECK PERMISSIONS ==========
   Future<bool> _checkBluetoothPermissions() async {
     try {
-      // ✅ Request semua permission
       Map<Permission, PermissionStatus> statuses = await [
         Permission.bluetooth,
         Permission.bluetoothScan,
@@ -76,7 +78,6 @@ class PrinterController extends ChangeNotifier {
   // ========== CHECK GPS/LOCATION ==========
   Future<bool> _checkLocationServices() async {
     try {
-      // Cek apakah GPS aktif
       final serviceStatus = await Permission.location.serviceStatus;
       if (!serviceStatus.isEnabled) {
         _error = 'Mohon aktifkan GPS/Lokasi untuk mencari perangkat Bluetooth.';
@@ -85,7 +86,7 @@ class PrinterController extends ChangeNotifier {
       }
       return true;
     } catch (e) {
-      return true; // Skip jika error
+      return true;
     }
   }
 
@@ -195,7 +196,9 @@ class PrinterController extends ChangeNotifier {
     }
   }
 
-  // ========== PRINT RECEIPT ==========
+  // ====================================================================
+  // ✅ PRINT RECEIPT - VERSI FINAL (DIPERBAIKI)
+  // ====================================================================
   Future<bool> printReceipt(Map<String, dynamic> data) async {
     if (!_isConnected || _connectedDevice == null) {
       _error = 'Printer tidak terhubung';
@@ -209,9 +212,9 @@ class PrinterController extends ChangeNotifier {
       
       List<int> bytes = [];
       
-      // Header
+      // ========== HEADER ==========
       bytes += generator.text(
-        data['header'] ?? 'SALON',
+        data['header']?.toString() ?? 'SALON CANTIK',
         styles: const PosStyles(
           align: PosAlign.center,
           bold: true,
@@ -221,52 +224,182 @@ class PrinterController extends ChangeNotifier {
       );
       
       bytes += generator.text(
-        '=' * 32,
+        'Jl. Contoh No. 123',
         styles: const PosStyles(align: PosAlign.center),
       );
       
-      // Items
-      if (data['items'] != null) {
-        for (var item in data['items']) {
+      bytes += generator.text(
+        'Telp: 0812-3456-7890',
+        styles: const PosStyles(align: PosAlign.center),
+      );
+      
+      bytes += generator.hr();
+      
+      // ========== INVOICE INFO ==========
+      if (data['invoice'] != null) {
+        bytes += generator.text(
+          'No. ${data['invoice']}',
+          styles: const PosStyles(
+            align: PosAlign.center,
+            bold: true,
+          ),
+        );
+      }
+      
+      if (data['date'] != null) {
+        final dateStr = data['date'].toString();
+        try {
+          final date = DateTime.parse(dateStr);
           bytes += generator.text(
-            item['name'] ?? '',
-            styles: const PosStyles(align: PosAlign.left),
+            '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}',
+            styles: const PosStyles(align: PosAlign.center),
           );
+        } catch (e) {
           bytes += generator.text(
-            '${item['qty']} x Rp ${item['price']}',
-            styles: const PosStyles(align: PosAlign.left),
-          );
-          bytes += generator.text(
-            'Subtotal: Rp ${item['subtotal']}',
-            styles: const PosStyles(align: PosAlign.right),
-          );
-          bytes += generator.text(
-            '-' * 32,
+            dateStr,
             styles: const PosStyles(align: PosAlign.center),
           );
         }
       }
       
-      // Total
-      bytes += generator.text(
-        'TOTAL: Rp ${data['total'] ?? 0}',
-        styles: const PosStyles(
-          align: PosAlign.center,
-          bold: true,
-          height: PosTextSize.size2,
-        ),
-      );
+      if (data['cashier'] != null) {
+        bytes += generator.text(
+          'Kasir: ${data['cashier']}',
+          styles: const PosStyles(align: PosAlign.center),
+        );
+      }
       
-      // Footer
+      bytes += generator.hr();
+      
+      // ========== ITEMS ==========
+      final items = data['items'];
+      if (items != null && items is List && items.isNotEmpty) {
+        for (var i = 0; i < items.length; i++) {
+          final item = items[i];
+          if (item is Map<String, dynamic>) {
+            final name = (item['name'] ?? '').toString();
+            final qty = item['qty'] ?? 1;
+            final price = item['price'] ?? 0;
+            final subtotal = item['subtotal'] ?? 0;
+            
+            // ✅ Baris 1: NAMA (kiri) | QTY (kanan) - BOLD
+            String qtyStr = 'x$qty';
+            String line1 = _padTwoColumns(name, qtyStr, paperWidth);
+            bytes += generator.text(
+              line1,
+              styles: const PosStyles(
+                align: PosAlign.left,
+                bold: true,
+              ),
+            );
+            
+            // ✅ Baris 2: HARGA (kiri) | SUBTOTAL (kanan) - NORMAL
+            String priceStr = _formatCurrency(price);
+            String subtotalStr = _formatCurrency(subtotal);
+            String line2 = _padTwoColumns('  @$priceStr', subtotalStr, paperWidth);
+            bytes += generator.text(
+              line2,
+              styles: const PosStyles(
+                align: PosAlign.left,
+              ),
+            );
+            
+            // Garis pemisah antar item
+            if (i < items.length - 1) {
+              bytes += generator.text(
+                '- ' * 16,
+                styles: const PosStyles(align: PosAlign.center),
+              );
+            }
+          }
+        }
+      } else {
+        bytes += generator.text(
+          'Tidak ada item',
+          styles: const PosStyles(align: PosAlign.center),
+        );
+        bytes += generator.feed(1);
+      }
+      
+      bytes += generator.hr();
+      
+      // ========== TOTAL ==========
+      final total = data['total'];
+      if (total != null) {
+        String totalStr = _formatCurrency(total);
+        String lineTotal = _padTwoColumns('TOTAL', totalStr, paperWidth);
+        bytes += generator.text(
+          lineTotal,
+          styles: const PosStyles(
+            align: PosAlign.left,
+            bold: true,
+            height: PosTextSize.size2,
+            width: PosTextSize.size2,
+          ),
+        );
+      }
+      
       bytes += generator.text(
-        '=' * 32,
+        '- ' * 16,
         styles: const PosStyles(align: PosAlign.center),
       );
       
-      bytes += generator.text(
-        data['footer'] ?? 'Terima kasih telah berkunjung',
-        styles: const PosStyles(align: PosAlign.center),
-      );
+      // ========== PAYMENT DETAILS ==========
+      if (data['payment_method'] != null) {
+        String methodLine = _padTwoColumns(
+          'Metode Bayar',
+          data['payment_method'].toString().toUpperCase(),
+          paperWidth,
+        );
+        bytes += generator.text(
+          methodLine,
+          styles: const PosStyles(align: PosAlign.left),
+        );
+      }
+      
+      if (data['cash_amount'] != null && data['cash_amount'] > 0) {
+        String cashLine = _padTwoColumns(
+          'Tunai',
+          _formatCurrency(data['cash_amount']),
+          paperWidth,
+        );
+        bytes += generator.text(
+          cashLine,
+          styles: const PosStyles(align: PosAlign.left),
+        );
+      }
+      
+      if (data['change_amount'] != null && data['change_amount'] > 0) {
+        String changeLine = _padTwoColumns(
+          'Kembalian',
+          _formatCurrency(data['change_amount']),
+          paperWidth,
+        );
+        bytes += generator.text(
+          changeLine,
+          styles: const PosStyles(
+            align: PosAlign.left,
+            bold: true,
+          ),
+        );
+      }
+      
+      bytes += generator.hr();
+      
+      // ========== FOOTER ==========
+      bytes += generator.feed(1);
+      
+      if (data['footer'] != null) {
+        bytes += generator.text(
+          data['footer'].toString(),
+          styles: const PosStyles(
+            align: PosAlign.center,
+            bold: false,
+          ),
+        );
+      }
+      
+      bytes += generator.feed(2);
       
       // Cut paper
       bytes += generator.cut();
@@ -276,10 +409,57 @@ class PrinterController extends ChangeNotifier {
       return success;
     } catch (e) {
       _error = e.toString();
+      notifyListeners();
       return false;
     }
   }
 
+  // ====================================================================
+  // ✅ HELPER METHODS
+  // ====================================================================
+
+  /// Format dua kolom dengan spasi di tengah
+  /// Contoh: "Nama Barang          x1"
+  String _padTwoColumns(String left, String right, int width) {
+    // Hitung panjang teks kiri dan kanan
+    int leftLen = left.length;
+    int rightLen = right.length;
+    
+    // Jika total melebihi lebar, potong teks kiri
+    if (leftLen + rightLen > width) {
+      int maxLeft = width - rightLen - 1;
+      if (maxLeft > 3) {
+        left = '${left.substring(0, maxLeft - 2)}..';
+        leftLen = left.length;
+      }
+    }
+    
+    // Hitung jumlah spasi
+    int spaces = width - leftLen - rightLen;
+    if (spaces < 1) spaces = 1;
+    
+    // Return dengan spasi di tengah
+    return '$left${' ' * spaces}$right';
+  }
+
+  /// Format currency dengan pemisah ribuan
+  String _formatCurrency(dynamic value) {
+    double amount = 0;
+    if (value is double) {
+      amount = value;
+    } else if (value is int) {
+      amount = value.toDouble();
+    } else if (value is String) {
+      amount = double.tryParse(value) ?? 0;
+    }
+    
+    // Format angka dengan titik pemisah ribuan
+    String formatted = amount.toStringAsFixed(0);
+    final regExp = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    formatted = formatted.replaceAllMapped(regExp, (Match m) => '${m[1]}.');
+    
+    return 'Rp$formatted';
+  }
 
   // ========== DISCOVER CHARACTERISTICS ==========
   Future<void> _discoverCharacteristics(BluetoothDevice device) async {
@@ -312,7 +492,6 @@ class PrinterController extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
-      // ✅ CEK IZIN
       final hasPermission = await _checkBluetoothPermissions();
       if (!hasPermission) {
         _isScanning = false;
@@ -320,7 +499,6 @@ class PrinterController extends ChangeNotifier {
         return;
       }
 
-      // ✅ CEK GPS/LOCATION (WAJIB untuk Android)
       final hasLocation = await _checkLocationServices();
       if (!hasLocation) {
         _isScanning = false;
@@ -328,7 +506,6 @@ class PrinterController extends ChangeNotifier {
         return;
       }
 
-      // ✅ CEK BLUETOOTH
       final adapterState = await FlutterBluePlus.adapterState.first;
       if (adapterState != BluetoothAdapterState.on) {
         _error = 'Bluetooth tidak aktif. Silakan aktifkan Bluetooth terlebih dahulu.';
@@ -337,7 +514,6 @@ class PrinterController extends ChangeNotifier {
         return;
       }
 
-      // ✅ AMBIL SEMUA DEVICE YANG SUDAH DIPAIR
       try {
         final bondedDevices = await FlutterBluePlus.bondedDevices;
         print('📱 Bonded devices found: ${bondedDevices.length}');
@@ -352,7 +528,6 @@ class PrinterController extends ChangeNotifier {
         print('Error getting bonded devices: $e');
       }
 
-      // ✅ AMBIL DEVICE YANG SUDAH TERHUBUNG
       try {
         final connectedDevices = await FlutterBluePlus.connectedDevices;
         print('🔗 Connected devices: ${connectedDevices.length}');
@@ -367,25 +542,19 @@ class PrinterController extends ChangeNotifier {
         print('Error getting connected devices: $e');
       }
 
-      // ✅ TUNGGU SEBENTAR SEBELUM SCAN
       await Future.delayed(const Duration(milliseconds: 500));
 
-      // ✅ STOP SCAN SEBELUMNYA (JIKA ADA)
       try {
         await FlutterBluePlus.stopScan();
       } catch (e) {
         // Ignore
       }
 
-      // ✅ START SCAN DENGAN TIMEOUT LEBIH LAMA
-      // DAN TANPA FILTER AGAR MENDAPATKAN SEMUA DEVICE
       print('🔍 Starting Bluetooth scan...');
       
       try {
         await FlutterBluePlus.startScan(
-          timeout: const Duration(seconds: 30), // ⬆️ Naikkan timeout
-          // ❌ JANGAN gunakan withServices filter agar semua device terdeteksi
-          // withServices: [Guid('00001101-0000-1000-8000-00805F9B34FB')],
+          timeout: const Duration(seconds: 30),
         );
         print('✅ Scan started successfully');
       } catch (e) {
@@ -396,24 +565,20 @@ class PrinterController extends ChangeNotifier {
         return;
       }
 
-      // ✅ LISTEN SCAN RESULTS - TAMPILKAN SEMUA DEVICE
       _scanSubscription = FlutterBluePlus.scanResults.listen(
         (results) {
           print('📡 Scan results received: ${results.length} devices');
           
           for (ScanResult result in results) {
             final device = result.device;
-            final rssi = result.rssi; // Signal strength
-            final manufacturerData = result.advertisementData.manufacturerData;
+            final rssi = result.rssi;
             final serviceUuids = result.advertisementData.serviceUuids;
             
-            // ✅ Print detail device untuk debugging
             print('  📻 Found: ${device.platformName}');
             print('     Address: ${device.remoteId}');
             print('     RSSI: $rssi dBm');
             print('     Service UUIDs: $serviceUuids');
             
-            // ✅ Tambahkan SEMUA device (tidak hanya printer)
             if (!_devices.any((d) => d.remoteId == device.remoteId)) {
               _devices.add(device);
               notifyListeners();
@@ -426,7 +591,6 @@ class PrinterController extends ChangeNotifier {
         },
       );
 
-      // ✅ AUTO STOP SETELAH TIMEOUT
       Future.delayed(const Duration(seconds: 30), () async {
         await stopScan();
       });
@@ -439,7 +603,6 @@ class PrinterController extends ChangeNotifier {
     }
   }
 
-  // ✅ Method untuk stop scan
   Future<void> stopScan() async {
     try {
       await FlutterBluePlus.stopScan();
@@ -453,7 +616,6 @@ class PrinterController extends ChangeNotifier {
     notifyListeners();
   }
   
-  // ========== CONNECT TO PRINTER ==========
   Future<bool> connectToDevice(BluetoothDevice device) async {
     try {
       _isLoading = true;
@@ -503,7 +665,6 @@ class PrinterController extends ChangeNotifier {
     }
   }
 
-  // ========== DISCONNECT PRINTER ==========
   Future<void> disconnectPrinter() async {
     try {
       if (_connectedDevice != null && _connectedDevice!.isConnected) {
@@ -529,7 +690,6 @@ class PrinterController extends ChangeNotifier {
     }
   }
 
-  // ========== SEND DATA TO PRINTER ==========
   Future<bool> _sendData(List<int> data) async {
     if (_writeCharacteristic == null) {
       _error = 'Karakteristik write tidak tersedia';
@@ -550,7 +710,6 @@ class PrinterController extends ChangeNotifier {
     }
   }
 
-  // ========== TEST PRINT ==========
   Future<bool> testPrint() async {
     if (!_isConnected || _connectedDevice == null) {
       _error = 'Printer tidak terhubung';
@@ -574,10 +733,7 @@ class PrinterController extends ChangeNotifier {
         ),
       );
       
-      bytes += generator.text(
-        '=' * 32,
-        styles: const PosStyles(align: PosAlign.center),
-      );
+      bytes += generator.hr();
       
       bytes += generator.text(
         'Printer: ${_connectedDevice?.platformName ?? 'Thermal'}',
@@ -590,14 +746,11 @@ class PrinterController extends ChangeNotifier {
       );
       
       bytes += generator.text(
-        'Waktu: ${DateTime.now().toString()}',
+        'Waktu: ${DateTime.now().toString().substring(0, 19)}',
         styles: const PosStyles(align: PosAlign.center),
       );
       
-      bytes += generator.text(
-        '-' * 32,
-        styles: const PosStyles(align: PosAlign.center),
-      );
+      bytes += generator.hr();
       
       bytes += generator.text(
         'Terima kasih',
@@ -613,8 +766,6 @@ class PrinterController extends ChangeNotifier {
       return false;
     }
   }
-
-  
 
   @override
   void dispose() {

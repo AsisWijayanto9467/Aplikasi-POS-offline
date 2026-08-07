@@ -17,7 +17,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   late final DashboardController _controller;
   bool _showLowStockAlert = true;
-  
+
   final _currencyFormat = NumberFormat.currency(
     locale: 'id_ID',
     symbol: 'Rp ',
@@ -45,7 +45,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (_controller.lowStockProducts.isEmpty) {
           _showLowStockAlert = false;
         }
-        
+
         return Container(
           color: const Color(0xFFF9F9FE),
           child: RefreshIndicator(
@@ -61,9 +61,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildBody() {
     if (_controller.isLoading) {
       return const Center(
-        child: CircularProgressIndicator(
-          color: Color(0xFF9A25AE),
-        ),
+        child: CircularProgressIndicator(color: Color(0xFF9A25AE)),
       );
     }
 
@@ -110,7 +108,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // ========== HELPER SAFE CASTING ==========
-  
+
   double _toDouble(dynamic value) {
     if (value == null) return 0.0;
     if (value is double) return value;
@@ -166,10 +164,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               'Terakhir diperbarui: ${DateFormat('HH:mm:ss').format(_controller.lastUpdated!)}',
-              style: const TextStyle(
-                fontSize: 11,
-                color: Color(0xFF837281),
-              ),
+              style: const TextStyle(fontSize: 11, color: Color(0xFF837281)),
             ),
           ),
       ],
@@ -179,17 +174,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // ========== LOW STOCK ALERT BANNER ==========
   Widget _buildLowStockAlertBanner() {
     final lowStockCount = _controller.lowStockProducts.length;
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFFF6B6B),
-            Color(0xFFFF8E8E),
-          ],
+          colors: [Color(0xFFFF6B6B), Color(0xFFFF8E8E)],
         ),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
@@ -277,10 +269,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF7E0092),
-            Color(0xFF9C27B0),
-          ],
+          colors: [Color(0xFF7E0092), Color(0xFF9C27B0)],
         ),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
@@ -334,7 +323,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(20),
@@ -343,7 +335,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          _controller.todayRevenue >= _controller.yesterdayRevenue
+                          _controller.todayRevenue >=
+                                  _controller.yesterdayRevenue
                               ? Icons.trending_up_rounded
                               : Icons.trending_down_rounded,
                           color: Colors.white,
@@ -382,8 +375,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // ========== CHART SECTION (MIRIP REPORT) ==========
   Widget _buildChartSection() {
     final revenue = _controller.dailyRevenue;
-    final chartData = revenue.map((item) => _toDouble(item['revenue'])).toList();
-    final maxValue = chartData.isNotEmpty ? chartData.reduce((a, b) => a > b ? a : b) : 0.0;
+    final chartData =
+        revenue.map((item) => _toDouble(item['revenue'])).toList();
+    final maxValue =
+        chartData.isNotEmpty ? chartData.reduce((a, b) => a > b ? a : b) : 0.0;
     final maxY = maxValue > 0 ? maxValue * 1.2 : 100.0;
 
     return Container(
@@ -391,10 +386,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFFE2E2E7),
-          width: 1,
-        ),
+        border: Border.all(color: const Color(0xFFE2E2E7), width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.02),
@@ -458,9 +450,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       sideTitles: SideTitles(
                         showTitles: true,
                         getTitlesWidget: (value, meta) {
-                          final days = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+                          final days = [
+                            'Sen',
+                            'Sel',
+                            'Rab',
+                            'Kam',
+                            'Jum',
+                            'Sab',
+                            'Min',
+                          ];
                           final index = value.toInt();
-                          if (index >= 0 && index < revenue.length && index < days.length) {
+                          if (index >= 0 &&
+                              index < revenue.length &&
+                              index < days.length) {
                             return Padding(
                               padding: const EdgeInsets.only(top: 8),
                               child: Text(
@@ -513,28 +515,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     },
                   ),
                   borderData: FlBorderData(show: false),
-                  barGroups: chartData.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final value = entry.value;
-                    final isHighest = value == maxValue && value > 0;
-                    
-                    return BarChartGroupData(
-                      x: index,
-                      barRods: [
-                        BarChartRodData(
-                          toY: value,
-                          color: isHighest 
-                              ? const Color(0xFF7E0092) 
-                              : const Color(0xFF9A25AE).withOpacity(0.6),
-                          width: 24,
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(4),
-                            topRight: Radius.circular(4),
-                          ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
+                  barGroups:
+                      chartData.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final value = entry.value;
+                        final isHighest = value == maxValue && value > 0;
+
+                        return BarChartGroupData(
+                          x: index,
+                          barRods: [
+                            BarChartRodData(
+                              toY: value,
+                              color:
+                                  isHighest
+                                      ? const Color(0xFF7E0092)
+                                      : const Color(
+                                        0xFF9A25AE,
+                                      ).withOpacity(0.6),
+                              width: 24,
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(4),
+                                topRight: Radius.circular(4),
+                              ),
+                            ),
+                          ],
+                        );
+                      }).toList(),
                 ),
               ),
             )
@@ -557,10 +563,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     SizedBox(height: 8),
                     Text(
                       'Belum ada data transaksi\nminggu ini',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF514250),
-                      ),
+                      style: TextStyle(fontSize: 14, color: Color(0xFF514250)),
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -614,9 +617,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFFF8D4FE).withOpacity(0.3),
-        ),
+        border: Border.all(color: const Color(0xFFF8D4FE).withOpacity(0.3)),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF9A25AE).withOpacity(0.04),
@@ -635,11 +636,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               color: iconBackgroundColor,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(
-              icon,
-              color: iconColor,
-              size: 20,
-            ),
+            child: Icon(icon, color: iconColor, size: 20),
           ),
           const SizedBox(height: 8),
           Text(
@@ -682,7 +679,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(height: 12),
         if (services.isNotEmpty)
           SizedBox(
-            height: 130,
+            height: 140, // ✅ Tambah tinggi dari 130 ke 140
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
@@ -702,10 +699,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 final icon = iconMap[service['item_name']] ?? Icons.spa_rounded;
                 final count = _toInt(service['count']);
                 final revenue = _toDouble(service['total_revenue']);
-                
+
                 return Container(
                   width: 160,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(
+                    14,
+                  ), // ✅ Kurangi padding dari 16 ke 14
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
@@ -761,22 +760,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                         ],
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(
+                        height: 8,
+                      ), // ✅ Kurangi spacing dari 10 ke 8
                       Text(
                         service['item_name'] as String? ?? 'Unknown',
                         style: const TextStyle(
-                          fontSize: 14,
+                          fontSize: 13, // ✅ Kurangi font size dari 14 ke 13
                           fontWeight: FontWeight.w600,
                           color: Color(0xFF1A1C1F),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(
+                        height: 2,
+                      ), // ✅ Kurangi spacing dari 4 ke 2
                       Text(
                         '$count bookings',
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 10, // ✅ Kurangi font size dari 11 ke 10
                           fontWeight: FontWeight.w500,
                           color: Color(0xFF514250),
                         ),
@@ -784,7 +787,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Text(
                         _currencyFormat.format(revenue),
                         style: const TextStyle(
-                          fontSize: 12,
+                          fontSize: 11, // ✅ Kurangi font size dari 12 ke 11
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF7E0092),
                         ),
@@ -809,18 +812,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: const Center(
               child: Column(
                 children: [
-                  Icon(
-                    Icons.spa_rounded,
-                    color: Color(0xFFD5C1D2),
-                    size: 32,
-                  ),
+                  Icon(Icons.spa_rounded, color: Color(0xFFD5C1D2), size: 32),
                   SizedBox(height: 8),
                   Text(
                     'Belum ada data layanan',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF514250),
-                    ),
+                    style: TextStyle(fontSize: 14, color: Color(0xFF514250)),
                   ),
                 ],
               ),
@@ -839,9 +835,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFFFFDAD6).withOpacity(0.15),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFFBA1A1A).withOpacity(0.1),
-        ),
+        border: Border.all(color: const Color(0xFFBA1A1A).withOpacity(0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -891,134 +885,145 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: 12),
           Column(
-            children: products.map((product) {
-              final name = product['name'] as String? ?? 'Unknown Product';
-              final stock = _toInt(product['stock']);
-              final minStock = _toInt(product['min_stock']);
-              final stockPercentage = minStock > 0 ? (stock / minStock) : 0.0;
-              
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: const Color(0xFFE2E2E7).withOpacity(0.5),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Row(
+            children:
+                products.map((product) {
+                  final name = product['name'] as String? ?? 'Unknown Product';
+                  final stock = _toInt(product['stock']);
+                  final minStock = _toInt(product['min_stock']);
+                  final stockPercentage =
+                      minStock > 0 ? (stock / minStock) : 0.0;
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFFE2E2E7).withOpacity(0.5),
+                      ),
+                    ),
+                    child: Column(
                       children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8D4FE).withOpacity(0.5),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(
-                            Icons.inventory_2_rounded,
-                            color: Color(0xFF7E0092),
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                name,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF1A1C1F),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                        Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8D4FE).withOpacity(0.5),
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                              const SizedBox(height: 4),
-                              Row(
+                              child: const Icon(
+                                Icons.inventory_2_rounded,
+                                color: Color(0xFF7E0092),
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: stock == 0
-                                          ? const Color(0xFFBA1A1A).withOpacity(0.1)
-                                          : const Color(0xFFFF9800).withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Text(
-                                      'Stok: $stock',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: stock == 0
-                                            ? const Color(0xFFBA1A1A)
-                                            : const Color(0xFFFF9800),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
                                   Text(
-                                    'Min: $minStock',
+                                    name,
                                     style: const TextStyle(
-                                      fontSize: 11,
-                                      color: Color(0xFF837281),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF1A1C1F),
                                     ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color:
+                                              stock == 0
+                                                  ? const Color(
+                                                    0xFFBA1A1A,
+                                                  ).withOpacity(0.1)
+                                                  : const Color(
+                                                    0xFFFF9800,
+                                                  ).withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          'Stok: $stock',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color:
+                                                stock == 0
+                                                    ? const Color(0xFFBA1A1A)
+                                                    : const Color(0xFFFF9800),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Min: $minStock',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFF837281),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: stock == 0
-                                ? const Color(0xFFBA1A1A)
-                                : const Color(0xFFFF9800),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            stock == 0 ? 'Habis' : 'Restock',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
                             ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color:
+                                    stock == 0
+                                        ? const Color(0xFFBA1A1A)
+                                        : const Color(0xFFFF9800),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                stock == 0 ? 'Habis' : 'Restock',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: stockPercentage.clamp(0.0, 1.0),
+                            backgroundColor: const Color(0xFFE2E2E7),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              stock == 0
+                                  ? const Color(0xFFBA1A1A)
+                                  : stockPercentage < 0.5
+                                  ? const Color(0xFFFF9800)
+                                  : const Color(0xFF4CAF50),
+                            ),
+                            minHeight: 4,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: stockPercentage.clamp(0.0, 1.0),
-                        backgroundColor: const Color(0xFFE2E2E7),
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          stock == 0
-                              ? const Color(0xFFBA1A1A)
-                              : stockPercentage < 0.5
-                                  ? const Color(0xFFFF9800)
-                                  : const Color(0xFF4CAF50),
-                        ),
-                        minHeight: 4,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
+                  );
+                }).toList(),
           ),
         ],
       ),
@@ -1088,10 +1093,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   SizedBox(height: 8),
                   Text(
                     'Belum ada transaksi',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF514250),
-                    ),
+                    style: TextStyle(fontSize: 14, color: Color(0xFF514250)),
                   ),
                 ],
               ),
@@ -1111,116 +1113,131 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
             child: Column(
-              children: transactions.asMap().entries.map((entry) {
-                final index = entry.key;
-                final transaction = entry.value;
-                final isLast = index == transactions.length - 1;
-                
-                final invoiceNumber = transaction['invoice_number'] as String? ?? '-';
-                final paymentMethod = transaction['payment_method'] as String? ?? 'Cash';
-                final grandTotal = _toDouble(transaction['grand_total']);
-                final itemCount = _toInt(transaction['item_count']);
-                final status = transaction['status'] as String? ?? 'pending';
-                
-                String timeDisplay = '--:--';
-                final transactionDate = transaction['transaction_date'] as String?;
-                if (transactionDate != null) {
-                  try {
-                    final date = DateTime.parse(transactionDate);
-                    timeDisplay = '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-                  } catch (e) {}
-                }
-                
-                final isQRIS = paymentMethod.toLowerCase() == 'qris';
-                final paymentIcon = isQRIS ? Icons.qr_code_rounded : Icons.payments_rounded;
-                final paymentColor = isQRIS ? const Color(0xFF4CAF50) : const Color(0xFFFF9800);
-                
-                final statusColor = status == 'completed' 
-                    ? const Color(0xFF4CAF50) 
-                    : status == 'refunded'
-                        ? const Color(0xFFBA1A1A)
-                        : const Color(0xFFFF9800);
-                
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    border: isLast
-                        ? null
-                        : const Border(
-                            bottom: BorderSide(
-                              color: Color(0xFFE2E2E7),
-                              width: 0.5,
-                            ),
-                          ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: paymentColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              paymentIcon,
-                              color: paymentColor,
-                              size: 22,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Text(
-                                    invoiceNumber,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF1A1C1F),
-                                    ),
+              children:
+                  transactions.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final transaction = entry.value;
+                    final isLast = index == transactions.length - 1;
+
+                    final invoiceNumber =
+                        transaction['invoice_number'] as String? ?? '-';
+                    final paymentMethod =
+                        transaction['payment_method'] as String? ?? 'Cash';
+                    final grandTotal = _toDouble(transaction['grand_total']);
+                    final itemCount = _toInt(transaction['item_count']);
+                    final status =
+                        transaction['status'] as String? ?? 'pending';
+
+                    String timeDisplay = '--:--';
+                    final transactionDate =
+                        transaction['transaction_date'] as String?;
+                    if (transactionDate != null) {
+                      try {
+                        final date = DateTime.parse(transactionDate);
+                        timeDisplay =
+                            '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+                      } catch (e) {}
+                    }
+
+                    final isQRIS = paymentMethod.toLowerCase() == 'qris';
+                    final paymentIcon =
+                        isQRIS ? Icons.qr_code_rounded : Icons.payments_rounded;
+                    final paymentColor =
+                        isQRIS
+                            ? const Color(0xFF4CAF50)
+                            : const Color(0xFFFF9800);
+
+                    final statusColor =
+                        status == 'completed'
+                            ? const Color(0xFF4CAF50)
+                            : status == 'refunded'
+                            ? const Color(0xFFBA1A1A)
+                            : const Color(0xFFFF9800);
+
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        border:
+                            isLast
+                                ? null
+                                : const Border(
+                                  bottom: BorderSide(
+                                    color: Color(0xFFE2E2E7),
+                                    width: 0.5,
                                   ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: BoxDecoration(
-                                      color: statusColor,
-                                      shape: BoxShape.circle,
+                                ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: paymentColor.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  paymentIcon,
+                                  color: paymentColor,
+                                  size: 22,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        invoiceNumber,
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF1A1C1F),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        width: 6,
+                                        height: 6,
+                                        decoration: BoxDecoration(
+                                          color: statusColor,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '$timeDisplay • $paymentMethod • $itemCount item${itemCount > 1 ? 's' : ''}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Color(0xFF837281),
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '$timeDisplay • $paymentMethod • $itemCount item${itemCount > 1 ? 's' : ''}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color(0xFF837281),
-                                ),
-                              ),
                             ],
+                          ),
+                          Text(
+                            _currencyFormat.format(grandTotal),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1A1C1F),
+                            ),
                           ),
                         ],
                       ),
-                      Text(
-                        _currencyFormat.format(grandTotal),
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF1A1C1F),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
+                    );
+                  }).toList(),
             ),
           ),
       ],
@@ -1259,10 +1276,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 8),
             Text(
               error,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF514250),
-              ),
+              style: const TextStyle(fontSize: 14, color: Color(0xFF514250)),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -1271,7 +1285,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF7E0092),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 14,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -1281,10 +1298,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               icon: const Icon(Icons.refresh_rounded, size: 20),
               label: const Text(
                 'Coba Lagi',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                ),
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
               ),
             ),
           ],

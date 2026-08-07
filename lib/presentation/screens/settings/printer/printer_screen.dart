@@ -1,6 +1,7 @@
 // lib/presentation/pages/settings/printer/printer_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter/services.dart';
 import 'package:salon_desk/core/theme/app_text_styles.dart';
 import 'package:salon_desk/data/controller/printer_controller.dart';
 import 'package:salon_desk/data/models/printer_setting_model.dart';
@@ -34,6 +35,12 @@ class _PrinterScreenState extends State<PrinterScreen> {
   @override
   void initState() {
     super.initState();
+
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+    
     _controller = PrinterController();
     _initController();
     

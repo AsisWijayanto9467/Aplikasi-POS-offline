@@ -258,8 +258,8 @@ class TransactionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ========== SAVE TRANSACTION ==========
-  Future<bool> saveTransaction() async {
+  
+Future<bool> saveTransaction() async {
     try {
       _isLoading = true;
       notifyListeners();
@@ -268,6 +268,26 @@ class TransactionController extends ChangeNotifier {
       final invoiceNumber = await _generateUniqueInvoiceNumber(db);
       
       _lastInvoiceNumber = invoiceNumber;
+
+      // ✅ SIMPAN DATA RECEIPT SEBELUM CLEAR CART
+      // Pastikan data tersimpan dengan format yang benar
+      _receiptData = {
+        'header': 'SALON CANTIK',
+        'invoice': invoiceNumber,
+        'date': DateTime.now().toString(),
+        'cashier': 'Kasir',
+        'items': _cartItems.map((item) => {
+          'name': item.itemName,
+          'qty': item.quantity,
+          'price': item.itemPrice,
+          'subtotal': item.itemPrice * item.quantity,
+        }).toList(),
+        'total': total,
+        'payment_method': _selectedPaymentMethod,
+        'cash_amount': _selectedPaymentMethod == 'cash' ? _cashAmount : 0,
+        'change_amount': _selectedPaymentMethod == 'cash' ? _changeAmount : 0,
+        'footer': 'Terima kasih telah berkunjung\nSimpan struk ini sebagai bukti pembayaran',
+      };
 
       final transaction = TransactionModel(
         invoiceNumber: invoiceNumber,
@@ -314,20 +334,9 @@ class TransactionController extends ChangeNotifier {
         }
       }
 
-      // ✅ Simpan receipt data sebelum clear
-      _receiptData = {
-        'header': 'SALON CANTIK',
-        'items': _cartItems.map((item) => {
-          'name': item.itemName,
-          'qty': item.quantity,
-          'price': item.itemPrice,
-          'subtotal': item.itemPrice * item.quantity,
-        }).toList(),
-        'total': total,
-        'footer': 'Terima kasih telah berkunjung',
-      };
-
-      clearCart();
+      // ✅ JANGAN clear cart dulu, simpan data receipt
+      // clearCart(); // <- HAPUS INI, pindahkan ke method terpisah
+      
       _isLoading = false;
       notifyListeners();
       return true;
@@ -338,6 +347,21 @@ class TransactionController extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  void clearAfterSuccess() {
+    _cartItems.clear();
+    _customerName = '';
+    _notes = '';
+    _cashAmount = 0;
+    _changeAmount = 0;
+    // JANGAN hapus _receiptData di sini, biarkan sampai selesai print
+    notifyListeners();
+  }
+
+  void clearReceiptData() {
+    _receiptData = null;
+    notifyListeners();
   }
 
   // ✅ Generate invoice number yang unik

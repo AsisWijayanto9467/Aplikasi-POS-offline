@@ -886,6 +886,10 @@ class _PaymentPageState extends State<PaymentPage> {
 
     final success = await widget.controller.saveTransaction();
     if (success && mounted) {
+      // ✅ JANGAN clear cart dulu, biarkan data receipt tetap ada
+      // widget.controller.clearCart(); // <- HAPUS INI
+      
+      // ✅ Panggil onSuccess untuk pindah ke halaman sukses
       widget.onSuccess();
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

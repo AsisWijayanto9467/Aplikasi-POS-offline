@@ -15,13 +15,17 @@ class SuccessPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ Debug: Print receipt data untuk memastikan data ada
+    print('📄 Receipt Data: ${controller.receiptData}');
+    
     // ✅ Ambil data struk dari controller
-    final receiptData = controller.receiptData ?? {
-      'header': 'SALON CANTIK',
-      'items': [],
-      'total': 0,
-      'footer': 'Terima kasih telah berkunjung',
-    };
+    final receiptData = controller.receiptData ?? {};
+    
+    // ✅ Debug: Print items
+    if (receiptData['items'] != null) {
+      print('📋 Items: ${receiptData['items']}');
+      print('📋 Items count: ${(receiptData['items'] as List).length}');
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -76,6 +80,17 @@ class SuccessPage extends StatelessWidget {
             ),
             textAlign: TextAlign.center,
           ),
+          
+          // ✅ Debug: Tampilkan jumlah item
+          if (receiptData['items'] != null)
+            Text(
+              '${(receiptData['items'] as List).length} item',
+              style: TextStyle(
+                fontSize: 11,
+                color: const Color(0xFF837281),
+              ),
+            ),
+          
           const SizedBox(height: 24),
           
           // Buttons
@@ -83,9 +98,12 @@ class SuccessPage extends StatelessWidget {
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    // ✅ Navigasi ke PrinterScreen dengan data struk
-                    Navigator.push(
+                  onPressed: () async {
+                    // ✅ Print receipt data sebelum navigasi
+                    print('🖨️ Printing receipt with data: $receiptData');
+                    
+                    // ✅ Navigasi ke PrinterScreen
+                    final result = await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => PrinterScreen(
@@ -93,6 +111,11 @@ class SuccessPage extends StatelessWidget {
                         ),
                       ),
                     );
+                    
+                    // ✅ Setelah kembali dari printer, clear receipt data
+                    if (result == true && context.mounted) {
+                      controller.clearReceiptData();
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF7E0092),
@@ -112,7 +135,12 @@ class SuccessPage extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: OutlinedButton(
-                  onPressed: onFinish,
+                  onPressed: () {
+                    // ✅ Clear cart dan receipt saat selesai
+                    controller.clearAfterSuccess();
+                    controller.clearReceiptData();
+                    onFinish();
+                  },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFF514250),
                     side: const BorderSide(color: Color(0xFFE2E2E7)),
@@ -133,7 +161,11 @@ class SuccessPage extends StatelessWidget {
           
           // Link kembali
           TextButton(
-            onPressed: onFinish,
+            onPressed: () {
+              controller.clearAfterSuccess();
+              controller.clearReceiptData();
+              onFinish();
+            },
             style: TextButton.styleFrom(
               padding: EdgeInsets.zero,
               minimumSize: Size.zero,
